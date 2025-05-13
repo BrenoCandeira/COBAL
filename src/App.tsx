@@ -25,6 +25,7 @@ function App() {
           <Route path="/presos/cadastro" element={<CadastroPresos />} />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Route>
+        <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     </Router>
   );
