@@ -70,6 +70,50 @@ const ITENS_QUINZENAIS: ItensMap = {
   'frutas': { nome: '250 g de frutas picadas e descascadas (mamão, maçã, pêssego, melancia, melão, banana, abacate, manga – em saco plástico)', max: 1 },
 };
 
+// Unificar todos os itens em um único objeto
+const ITENS_TODOS: ItensMap = { ...ITENS_TRIMESTRAIS, ...ITENS_QUINZENAIS, ...ITENS_PONTUAIS };
+
+// Adicionar unidade/medida para cada item (exemplo)
+const UNIDADES: { [key: string]: string } = {
+  lencol: 'unidade',
+  cobertor: 'unidade',
+  toalha: 'unidade',
+  camiseta: 'unidade',
+  bermuda: 'unidade',
+  calca: 'unidade',
+  blusa_manga_longa: 'unidade',
+  cueca: 'unidade',
+  chinelo: 'par',
+  colchao: 'unidade',
+  colher_plastica: 'unidade',
+  copo_plastico: 'unidade',
+  esponja_lavar: 'unidade',
+  rodo: 'unidade',
+  vassoura: 'unidade',
+  creme_dental: 'unidade',
+  desodorante: 'unidade',
+  detergente_litro: 'litro',
+  sabao_po: '500g',
+  desinfetante: 'litro',
+  sabonete_liquido: 'litro',
+  agua_sanitaria: 'litro',
+  detergente_500ml: 'frasco',
+  esponja_banho: 'unidade',
+  shampoo: 'ml',
+  condicionador: 'ml',
+  absorvente: 'unidade',
+  papel_higienico: 'rolo',
+  papel_higienico_fem: 'rolo',
+  cotonetes: 'unidade',
+  escova_dental: 'unidade',
+  barbeador: 'unidade',
+  bolacha: 'kg',
+  pao_forma: 'pacote',
+  presunto: 'g',
+  mussarela: 'g',
+  frutas: 'g',
+};
+
 interface Preso {
   id: string;
   nome: string;
@@ -119,12 +163,16 @@ export function RegistrarEntrega() {
 
       // Validar limites de itens
       const itens = data.itens;
-      const limites = tipoEntrega === 'trimestral' ? ITENS_TRIMESTRAIS : ITENS_QUINZENAIS;
-
       for (const [itemId, quantidade] of Object.entries(itens)) {
-        const max = limites[itemId]?.max ?? 0;
-        if (quantidade > max) {
-          throw new Error(`Quantidade excede o limite permitido para ${limites[itemId]?.nome || 'item desconhecido'}`);
+        const item = ITENS_TODOS[itemId];
+        if (!item) continue;
+        if (quantidade > item.max) {
+          setValue(`itens.${itemId}`, item.max);
+          throw new Error(`Quantidade excede o limite permitido para ${item.nome}`);
+        }
+        if (quantidade < 1) {
+          setValue(`itens.${itemId}`, 1);
+          throw new Error(`A quantidade mínima para ${item.nome} é 1.`);
         }
       }
 
@@ -230,7 +278,7 @@ export function RegistrarEntrega() {
                 </h3>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {Object.entries(tipoEntrega === 'trimestral' ? ITENS_TRIMESTRAIS : ITENS_QUINZENAIS).map(([id, item]) => {
+                  {Object.entries(ITENS_TODOS).map(([id, item]) => {
                     // Verificar restrição de sexo
                     if (item.sexo && item.sexo !== presoSelecionado.sexo) {
                       return null;
@@ -243,14 +291,16 @@ export function RegistrarEntrega() {
                         </label>
                         <input
                           type="number"
-                          min="0"
+                          min="1"
                           max={item.max}
                           {...register(`itens.${id}`, {
-                            min: 0,
+                            min: 1,
                             max: item.max,
+                            valueAsNumber: true,
                           })}
                           className="w-20 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                         />
+                        <span className="text-xs text-gray-500">{UNIDADES[id] || 'unidade'}</span>
                       </div>
                     );
                   })}
