@@ -160,49 +160,39 @@ export function RegistrarEntrega() {
     try {
       setLoading(true);
       setError('');
-
-      // Validar limites de itens
-      const itens = data.itens;
-      for (const [itemId, quantidade] of Object.entries(itens)) {
+      // Filtrar apenas itens com quantidade > 0
+      const itens = Object.entries(data.itens || {}).filter(([_, quantidade]) => quantidade && quantidade > 0);
+      for (const [itemId, quantidade] of itens) {
         const item = ITENS_TODOS[itemId];
         if (!item) continue;
         if (quantidade > item.max) {
           setValue(`itens.${itemId}`, item.max);
           throw new Error(`Quantidade excede o limite permitido para ${item.nome}`);
         }
-        if (quantidade < 1) {
-          setValue(`itens.${itemId}`, 1);
-          throw new Error(`A quantidade mínima para ${item.nome} é 1.`);
-        }
       }
-
+      if (itens.length === 0) {
+        throw new Error('Selecione ao menos um item para registrar a entrega.');
+      }
       // Registrar entrega
       const { data: entrega, error: entregaError } = await supabase
         .from('entregas')
         .insert({
           preso_id: data.preso_id,
-          tipo: data.tipo,
           usuario_id: (await supabase.auth.getUser()).data.user?.id,
         })
         .select()
         .single();
-
       if (entregaError) throw entregaError;
-
       // Registrar itens
-      const itensEntrega = Object.entries(data.itens).map(([item_id, quantidade]) => ({
+      const itensEntrega = itens.map(([item_id, quantidade]) => ({
         entrega_id: entrega.id,
         item_id,
         quantidade,
       }));
-
       const { error: itensError } = await supabase
         .from('itens_entrega')
         .insert(itensEntrega);
-
       if (itensError) throw itensError;
-
-      // Limpar formulário
       window.location.reload();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro ao registrar entrega');
@@ -257,56 +247,57 @@ export function RegistrarEntrega() {
               <p>Cela: {presoSelecionado.cela}</p>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700">
-                Tipo de Entrega
-              </label>
-              <select
-                {...register('tipo', { required: 'Selecione o tipo de entrega' })}
-                className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
-              >
-                <option value="">Selecione...</option>
-                <option value="trimestral">Entrega Trimestral</option>
-                <option value="quinzenal">Entrega Quinzenal</option>
-              </select>
+            {/* Balão de Itens Trimestrais */}
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 my-4">
+              <h3 className="text-md font-semibold mb-2 text-blue-800">Itens Trimestrais</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {Object.entries(ITENS_TRIMESTRAIS).map(([id, item]) => {
+                  if (item.sexo && item.sexo !== presoSelecionado.sexo) return null;
+                  return (
+                    <div key={id} className="flex items-center space-x-4">
+                      <label className="flex-1 text-sm font-medium text-gray-700">{item.nome}</label>
+                      <input
+                        type="number"
+                        min="0"
+                        max={item.max}
+                        {...register(`itens.${id}`, {
+                          max: item.max,
+                          valueAsNumber: true,
+                        })}
+                        className="w-20 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                      />
+                      <span className="text-xs text-gray-500">{UNIDADES[id] || 'unidade'}</span>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
 
-            {tipoEntrega && (
-              <div className="space-y-4">
-                <h3 className="text-lg font-medium">
-                  {tipoEntrega === 'trimestral' ? 'Itens Trimestrais' : 'Itens Quinzenais'}
-                </h3>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {Object.entries(ITENS_TODOS).map(([id, item]) => {
-                    // Verificar restrição de sexo
-                    if (item.sexo && item.sexo !== presoSelecionado.sexo) {
-                      return null;
-                    }
-
-                    return (
-                      <div key={id} className="flex items-center space-x-4">
-                        <label className="flex-1 text-sm font-medium text-gray-700">
-                          {item.nome}
-                        </label>
-                        <input
-                          type="number"
-                          min="1"
-                          max={item.max}
-                          {...register(`itens.${id}`, {
-                            min: 1,
-                            max: item.max,
-                            valueAsNumber: true,
-                          })}
-                          className="w-20 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                        />
-                        <span className="text-xs text-gray-500">{UNIDADES[id] || 'unidade'}</span>
-                      </div>
-                    );
-                  })}
-                </div>
+            {/* Balão de Itens Quinzenais */}
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4 my-4">
+              <h3 className="text-md font-semibold mb-2 text-green-800">Itens Quinzenais</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {Object.entries(ITENS_QUINZENAIS).map(([id, item]) => {
+                  if (item.sexo && item.sexo !== presoSelecionado.sexo) return null;
+                  return (
+                    <div key={id} className="flex items-center space-x-4">
+                      <label className="flex-1 text-sm font-medium text-gray-700">{item.nome}</label>
+                      <input
+                        type="number"
+                        min="0"
+                        max={item.max}
+                        {...register(`itens.${id}`, {
+                          max: item.max,
+                          valueAsNumber: true,
+                        })}
+                        className="w-20 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-green-500 focus:border-green-500"
+                      />
+                      <span className="text-xs text-gray-500">{UNIDADES[id] || 'unidade'}</span>
+                    </div>
+                  );
+                })}
               </div>
-            )}
+            </div>
           </>
         )}
 
