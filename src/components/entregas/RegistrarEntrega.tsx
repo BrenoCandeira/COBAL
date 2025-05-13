@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { supabase } from '../../lib/supabase';
 
@@ -83,9 +83,34 @@ export function RegistrarEntrega() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>('');
   const [presoSelecionado, setPresoSelecionado] = useState<Preso | null>(null);
-  const { register, handleSubmit, watch, formState: { errors } } = useForm<EntregaFormData>();
+  const [sugestoesPresos, setSugestoesPresos] = useState<Preso[]>([]);
+  const [buscaPreso, setBuscaPreso] = useState('');
+  const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm<EntregaFormData>();
 
   const tipoEntrega = watch('tipo');
+
+  // Buscar sugestões de presos por nome ou prontuário
+  useEffect(() => {
+    const buscar = async () => {
+      if (buscaPreso.length < 2) {
+        setSugestoesPresos([]);
+        return;
+      }
+      const { data, error } = await supabase
+        .from('presos')
+        .select('*')
+        .or(`nome.ilike.%${buscaPreso}%,prontuario.ilike.%${buscaPreso}%`);
+      setSugestoesPresos(data || []);
+    };
+    buscar();
+  }, [buscaPreso]);
+
+  // Função para selecionar preso da sugestão
+  const selecionarPreso = (preso: Preso) => {
+    setPresoSelecionado(preso);
+    setBuscaPreso(preso.nome);
+    setSugestoesPresos([]);
+  };
 
   const onSubmit = async (data: EntregaFormData) => {
     try {
@@ -97,8 +122,9 @@ export function RegistrarEntrega() {
       const limites = tipoEntrega === 'trimestral' ? ITENS_TRIMESTRAIS : ITENS_QUINZENAIS;
 
       for (const [itemId, quantidade] of Object.entries(itens)) {
-        if (quantidade > limites[itemId].max) {
-          throw new Error(`Quantidade excede o limite permitido para ${limites[itemId].nome}`);
+        const max = limites[itemId]?.max ?? 0;
+        if (quantidade > max) {
+          throw new Error(`Quantidade excede o limite permitido para ${limites[itemId]?.nome || 'item desconhecido'}`);
         }
       }
 
@@ -137,21 +163,6 @@ export function RegistrarEntrega() {
     }
   };
 
-  const buscarPreso = async (prontuario: string) => {
-    const { data, error } = await supabase
-      .from('presos')
-      .select('*')
-      .eq('prontuario', prontuario)
-      .single();
-
-    if (error) {
-      setError('Preso não encontrado');
-      return;
-    }
-
-    setPresoSelecionado(data as Preso);
-  };
-
   return (
     <div className="max-w-4xl mx-auto p-6">
       <h2 className="text-2xl font-bold mb-6">Registrar Entrega</h2>
@@ -159,15 +170,33 @@ export function RegistrarEntrega() {
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
         <div>
           <label className="block text-sm font-medium text-gray-700">
-            Prontuário do Preso
+            Nome ou Prontuário do Preso
           </label>
-          <div className="mt-1 flex rounded-md shadow-sm">
+          <div className="mt-1 flex rounded-md shadow-sm relative">
             <input
               type="text"
               className="flex-1 min-w-0 block w-full px-3 py-2 rounded-md border border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-              placeholder="Digite o prontuário"
-              onChange={(e) => buscarPreso(e.target.value)}
+              placeholder="Digite o nome ou prontuário"
+              value={buscaPreso}
+              onChange={e => {
+                setBuscaPreso(e.target.value);
+                setPresoSelecionado(null);
+              }}
+              autoComplete="off"
             />
+            {sugestoesPresos.length > 0 && (
+              <ul className="absolute z-10 left-0 right-0 bg-white border border-gray-300 rounded-md mt-1 max-h-48 overflow-y-auto shadow-lg">
+                {sugestoesPresos.map((preso) => (
+                  <li
+                    key={preso.id}
+                    className="px-4 py-2 cursor-pointer hover:bg-blue-100"
+                    onClick={() => selecionarPreso(preso)}
+                  >
+                    {preso.nome} — {preso.prontuario}
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
         </div>
 
