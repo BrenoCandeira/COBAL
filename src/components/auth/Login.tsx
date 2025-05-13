@@ -95,6 +95,22 @@ export function Login() {
             </button>
           </div>
         </form>
+        <div className="flex flex-col items-center mt-4 space-y-2">
+          <button
+            type="button"
+            className="text-primary-600 hover:underline text-sm"
+            onClick={() => navigate('/register')}
+          >
+            Cadastrar novo usuário
+          </button>
+          <button
+            type="button"
+            className="text-primary-600 hover:underline text-sm"
+            onClick={() => navigate('/reset-password')}
+          >
+            Esqueci minha senha
+          </button>
+        </div>
       </div>
     </div>
   );
