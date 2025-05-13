@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 
 interface ProtectedRouteProps {
@@ -9,6 +9,18 @@ interface ProtectedRouteProps {
 export function ProtectedRoute({ children }: ProtectedRouteProps) {
   const [carregando, setCarregando] = useState(true);
   const [autenticado, setAutenticado] = useState(false);
+  const location = useLocation();
+
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      setAutenticado(!!session);
+      setCarregando(false);
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
 
   useEffect(() => {
     verificarAutenticacao();
@@ -34,7 +46,8 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
   }
 
   if (!autenticado) {
-    return <Navigate to="/login" replace />;
+    // Salvar a rota atual para redirecionar após o login
+    return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
   return <>{children}</>;
