@@ -120,17 +120,10 @@ export function CadastroPresos() {
       let data = XLSX.utils.sheet_to_json(ws, { defval: '' });
       // Padronizar e limpar dados
       data = data.map((item: any) => {
-        let ala = (item.ala || '').toString().trim().toUpperCase();
-        if (ala.startsWith('ALA ')) ala = ala.slice(4);
-        if (ala.startsWith('A')) ala = 'Ala A';
-        else if (ala.startsWith('B')) ala = 'Ala B';
-        else if (ala.startsWith('C')) ala = 'Ala C';
-        else if (ala.startsWith('D')) ala = 'Ala D';
-        else ala = '';
         return {
           prontuario: (item.prontuario || '').toString().trim(),
           nome: (item.nome || '').toString().trim(),
-          ala: ala.replace('ALA ', 'Ala '),
+          ala: (item.ala || '').toString().trim(),
           cela: (item.cela || '').toString().trim(),
         };
       });
@@ -156,7 +149,7 @@ export function CadastroPresos() {
           prontuario: item.prontuario,
           nome: item.nome,
           sexo: 'masculino',
-          ala: item.ala.replace('ALA ', 'Ala '),
+          ala: item.ala,
           cela: item.cela,
         }));
       if (presosParaInserir.length === 0) {
