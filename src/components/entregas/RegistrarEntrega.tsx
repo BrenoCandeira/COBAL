@@ -4,7 +4,6 @@ import { supabase } from '../../lib/supabase';
 
 type EntregaFormData = {
   preso_id: string;
-  tipo: 'trimestral' | 'quinzenal';
   itens: {
     [key: string]: number;
   };
@@ -21,7 +20,7 @@ interface ItensMap {
 }
 
 // ITENS TRIMESTRAIS (com devolução obrigatória dos anteriores)
-const ITENS_TRIMESTRAIS: ItensMap = {
+export const ITENS_TRIMESTRAIS: ItensMap = {
   'lencol': { nome: 'Lençol de solteiro (amarelo ou branco, sem estampa)', max: 1 },
   'cobertor': { nome: 'Cobertor (não dupla face, amarelo ou branco, sem estampa)', max: 1 },
   'toalha': { nome: 'Toalha (amarela ou branca, sem estampa)', max: 1 },
@@ -34,7 +33,7 @@ const ITENS_TRIMESTRAIS: ItensMap = {
 };
 
 // ITENS DIVERSOS (entrega pontual)
-const ITENS_PONTUAIS: ItensMap = {
+export const ITENS_PONTUAIS: ItensMap = {
   'colchao': { nome: 'Colchão de solteiro (fino, até 12 cm)', max: 1 },
   'colher_plastica': { nome: 'Colher plástica escolar', max: 1 },
   'copo_plastico': { nome: 'Copo plástico escolar', max: 1 },
@@ -44,7 +43,7 @@ const ITENS_PONTUAIS: ItensMap = {
 };
 
 // ITENS QUINZENAIS (higiene, limpeza, alimentação)
-const ITENS_QUINZENAIS: ItensMap = {
+export const ITENS_QUINZENAIS: ItensMap = {
   'creme_dental': { nome: 'Creme dental em gel (exceto vermelho e branco)', max: 1 },
   'desodorante': { nome: 'Desodorante roll-on (embalagem branca e transparente)', max: 1 },
   'detergente_litro': { nome: '1 litro de detergente (em saco plástico transparente)', max: 1 },
@@ -131,8 +130,6 @@ export function RegistrarEntrega() {
   const [buscaPreso, setBuscaPreso] = useState('');
   const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm<EntregaFormData>();
 
-  const tipoEntrega = watch('tipo');
-
   // Buscar sugestões de presos por nome ou prontuário
   useEffect(() => {
     const buscar = async () => {
@@ -154,48 +151,70 @@ export function RegistrarEntrega() {
     setPresoSelecionado(preso);
     setBuscaPreso(preso.nome);
     setSugestoesPresos([]);
+    // Definir o preso_id no formulário quando selecionar o preso
+    setValue('preso_id', preso.id);
   };
 
   const onSubmit = async (data: EntregaFormData) => {
     try {
       setLoading(true);
       setError('');
-      // Filtrar apenas itens com quantidade > 0
-      const itens = Object.entries(data.itens || {}).filter(([_, quantidade]) => quantidade && quantidade > 0);
-      for (const [itemId, quantidade] of itens) {
-        const item = ITENS_TODOS[itemId];
-        if (!item) continue;
-        if (quantidade > item.max) {
-          setValue(`itens.${itemId}`, item.max);
-          throw new Error(`Quantidade excede o limite permitido para ${item.nome}`);
-        }
+      if (!presoSelecionado || !presoSelecionado.id) {
+        throw new Error('Selecione um preso para registrar a entrega');
       }
-      if (itens.length === 0) {
+
+      // Filtrar apenas itens com quantidade > 0
+      const itensSelecionados = Object.entries(data.itens || {}).filter(([_, quantidade]) => quantidade && quantidade > 0);
+      if (itensSelecionados.length === 0) {
         throw new Error('Selecione ao menos um item para registrar a entrega.');
       }
-      // Registrar entrega
-      const { data: entrega, error: entregaError } = await supabase
+
+      // Buscar última entrega do preso
+      const { data: ultimas } = await supabase
         .from('entregas')
-        .insert({
-          preso_id: data.preso_id,
-          usuario_id: (await supabase.auth.getUser()).data.user?.id,
-        })
-        .select()
-        .single();
-      if (entregaError) throw entregaError;
-      // Registrar itens
-      const itensEntrega = itens.map(([item_id, quantidade]) => ({
-        entrega_id: entrega.id,
-        item_id,
-        quantidade,
-      }));
-      const { error: itensError } = await supabase
-        .from('itens_entrega')
-        .insert(itensEntrega);
-      if (itensError) throw itensError;
+        .select('data_entrega, ' + Object.keys(ITENS_TODOS).join(', '))
+        .eq('preso_id', presoSelecionado.id)
+        .order('data_entrega', { ascending: false })
+        .limit(1);
+
+      const hoje = new Date();
+      if (ultimas && ultimas.length > 0) {
+        const ultima = ultimas[0] as { data_entrega: string; [key: string]: any };
+        for (const [itemId, quantidade] of itensSelecionados) {
+          const item = ITENS_TODOS[itemId];
+          if (!item) continue;
+          if (quantidade > item.max) {
+            setValue(`itens.${itemId}`, item.max);
+            throw new Error(`Quantidade excede o limite permitido para ${item.nome}`);
+          }
+          if (ultima[itemId] && ultima[itemId] > 0) {
+            const diff = (hoje.getTime() - new Date(ultima.data_entrega).getTime()) / (1000 * 60 * 60 * 24);
+            if (Object.keys(ITENS_TRIMESTRAIS).includes(itemId) && diff < 90) {
+              throw new Error(`${item.nome} só pode ser entregue a cada 90 dias.`);
+            }
+            if (Object.keys(ITENS_QUINZENAIS).includes(itemId) && diff < 15) {
+              throw new Error(`${item.nome} só pode ser entregue a cada 15 dias.`);
+            }
+          }
+        }
+      }
+
+      // Montar objeto para insert
+      const dadosEntrega: any = {
+        preso_id: presoSelecionado.id,
+        data_entrega: new Date().toISOString(),
+      };
+      for (const [itemId, quantidade] of itensSelecionados) {
+        dadosEntrega[itemId] = quantidade;
+      }
+
+      const { error } = await supabase.from('entregas').insert([dadosEntrega]);
+      if (error) throw error;
+
+      alert('Entrega registrada com sucesso!');
       window.location.reload();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erro ao registrar entrega');
+    } catch (err: any) {
+      setError(err.message || 'Erro ao registrar entrega');
     } finally {
       setLoading(false);
     }
@@ -319,4 +338,4 @@ export function RegistrarEntrega() {
       </form>
     </div>
   );
-} 
+}

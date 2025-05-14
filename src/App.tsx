@@ -1,4 +1,11 @@
-import { BrowserRouter as Router, Routes, Route, Navigate, Outlet } from 'react-router-dom';
+import { 
+  createBrowserRouter, 
+  RouterProvider,
+  createRoutesFromElements,
+  Route,
+  Navigate,
+  Outlet
+} from 'react-router-dom';
 import { Layout } from './components/layout/Layout';
 import { Dashboard } from './components/dashboard/Dashboard';
 import { RegistrarEntrega } from './components/entregas/RegistrarEntrega';
@@ -11,9 +18,9 @@ import { ResetPassword } from './components/auth/ResetPassword';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
 
 function App() {
-  return (
-    <Router>
-      <Routes>
+  const router = createBrowserRouter(
+    createRoutesFromElements(
+      <>
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/reset-password" element={<ResetPassword />} />
@@ -26,9 +33,11 @@ function App() {
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Route>
         <Route path="*" element={<Navigate to="/login" replace />} />
-      </Routes>
-    </Router>
+      </>
+    )
   );
+
+  return <RouterProvider router={router} />;
 }
 
 export default App;

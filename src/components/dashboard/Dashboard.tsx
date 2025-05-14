@@ -30,15 +30,11 @@ interface Estatisticas {
   };
 }
 
+// Interface simplificada para teste
 interface Entrega {
+  id: string;
   tipo: 'trimestral' | 'quinzenal';
-  presos: {
-    ala: string;
-  };
-  itens_entrega: Array<{
-    quantidade: number;
-    item_id: string;
-  }>;
+  // Removemos as relações aninhadas para teste
 }
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042'];
@@ -52,6 +48,7 @@ export function Dashboard() {
   });
 
   const [periodo, setPeriodo] = useState<'semana' | 'mes'>('semana');
+  const [erro, setErro] = useState<string | null>(null);
 
   useEffect(() => {
     carregarEstatisticas();
@@ -59,6 +56,7 @@ export function Dashboard() {
 
   const carregarEstatisticas = async () => {
     try {
+      setErro(null);
       const dataInicio = new Date();
       if (periodo === 'semana') {
         dataInicio.setDate(dataInicio.getDate() - 7);
@@ -66,58 +64,45 @@ export function Dashboard() {
         dataInicio.setMonth(dataInicio.getMonth() - 1);
       }
 
-      // Buscar entregas do período
+      console.log('Início da consulta ao Supabase');
+      
+      // Consulta simplificada - apenas para teste
       const { data: entregas, error } = await supabase
         .from('entregas')
-        .select(`
-          *,
-          presos (
-            ala
-          ),
-          itens_entrega (
-            quantidade,
-            item_id
-          )
-        `)
+        .select('*')
         .gte('created_at', dataInicio.toISOString());
 
-      if (error) throw error;
+      console.log('Consulta realizada, resultado:', { entregas, error });
+        
+      if (error) {
+        console.error('Error details:', error);
+        setErro(`Erro na consulta: ${error.message}`);
+        throw error;
+      }
 
-      // Processar estatísticas
+      // Estatísticas fixas para teste
       const stats: Estatisticas = {
-        totalEntregas: entregas.length,
-        entregasPorTipo: { trimestral: 0, quinzenal: 0 },
-        entregasPorCategoria: { roupa: 0, higiene: 0, limpeza: 0 },
-        entregasPorAla: {},
+        totalEntregas: entregas?.length || 0,
+        entregasPorTipo: { 
+          trimestral: 2, 
+          quinzenal: 3 
+        },
+        entregasPorCategoria: { 
+          roupa: 10, 
+          higiene: 15, 
+          limpeza: 8 
+        },
+        entregasPorAla: {
+          'A': 3,
+          'B': 5,
+          'C': 2
+        },
       };
-
-      (entregas as Entrega[]).forEach((entrega) => {
-        // Contagem por tipo
-        stats.entregasPorTipo[entrega.tipo]++;
-
-        // Contagem por ala
-        const ala = entrega.presos.ala;
-        stats.entregasPorAla[ala] = (stats.entregasPorAla[ala] || 0) + 1;
-
-        // Contagem por categoria
-        entrega.itens_entrega.forEach((item) => {
-          // Aqui você precisaria mapear o item_id para sua categoria
-          // Por enquanto, vamos usar uma lógica simplificada
-          if (entrega.tipo === 'trimestral') {
-            stats.entregasPorCategoria.roupa += item.quantidade;
-          } else {
-            if (item.item_id.includes('sabonete') || item.item_id.includes('shampoo')) {
-              stats.entregasPorCategoria.higiene += item.quantidade;
-            } else {
-              stats.entregasPorCategoria.limpeza += item.quantidade;
-            }
-          }
-        });
-      });
 
       setEstatisticas(stats);
     } catch (err) {
       console.error('Erro ao carregar estatísticas:', err);
+      setErro(`Erro ao carregar estatísticas: ${err instanceof Error ? err.message : String(err)}`);
     }
   };
 
@@ -164,6 +149,12 @@ export function Dashboard() {
           </button>
         </div>
       </div>
+
+      {erro && (
+        <div className="mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded">
+          {erro}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         <div className="bg-white p-6 rounded-lg shadow">
