@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { supabase } from '../../lib/supabase';
+import { useAuthStore } from '../../stores/authStore';
 
 type EntregaFormData = {
   preso_id: string;
@@ -44,36 +45,34 @@ export const ITENS_PONTUAIS: ItensMap = {
 
 // ITENS QUINZENAIS (higiene, limpeza, alimentação)
 export const ITENS_QUINZENAIS: ItensMap = {
-  'creme_dental': { nome: 'Creme dental em gel (exceto vermelho e branco)', max: 1 },
-  'desodorante': { nome: 'Desodorante roll-on (embalagem branca e transparente)', max: 1 },
-  'detergente_litro': { nome: '1 litro de detergente (em saco plástico transparente)', max: 1 },
-  'sabao_po': { nome: '500 g de sabão em pó (em saco plástico)', max: 1 },
-  'desinfetante': { nome: '4 litros de desinfetante (garrafa pet transparente, sem rótulo)', max: 1 },
-  'sabonete_liquido': { nome: '1 litro de sabonete líquido (garrafa pet transparente, sem rótulo)', max: 1 },
-  'agua_sanitaria': { nome: '1 litro de água sanitária (em saco plástico)', max: 1 },
-  'detergente_500ml': { nome: '2 frascos de 500 ml de detergente (transparente e sem rótulo)', max: 2 },
-  'esponja_banho': { nome: 'Esponja de banho (industrializada, até 15 cm) – não vegetal', max: 1 },
-  'shampoo': { nome: '300 ml de shampoo (em saco plástico)', max: 1 },
-  'condicionador': { nome: '400 ml de condicionador (em saco plástico)', max: 1 },
-  'absorvente': { nome: '20 absorventes (só para unidades femininas)', max: 20, sexo: 'feminino' },
-  'papel_higienico': { nome: '03 rolos de papel higiênico (masculino)', max: 3, sexo: 'masculino' },
-  'papel_higienico_fem': { nome: '06 rolos de papel higiênico (feminino)', max: 6, sexo: 'feminino' },
-  'cotonetes': { nome: '15 cotonetes (em saco plástico)', max: 15 },
+  'creme_dental': { nome: 'Creme dental em gel (exceto vermelho e branco)', max: 90 },
+  'desodorante': { nome: 'Desodorante roll-on (embalagem branca e transparente)', max: 50 },
+  'sabao_po': { nome: 'Sabão em pó (em saco plástico, até 800g)', max: 800 },
+  'desinfetante': { nome: 'Desinfetante (garrafa pet transparente, sem rótulo, até 4L)', max: 4000 },
+  'sabonete_liquido': { nome: 'Sabonete líquido (garrafa pet transparente, sem rótulo, até 500ml)', max: 500 },
+  'agua_sanitaria': { nome: 'Água sanitária (em saco plástico, até 1L)', max: 1000 },
+  'detergente_500ml': { nome: 'Detergente (transparente e sem rótulo, até 1000ml total)', max: 1000 },
+  'esponja_banho': { nome: 'Esponja de banho (industrializada, até 15 cm)', max: 1 },
+  'shampoo': { nome: 'Shampoo (em saco plástico, até 300ml)', max: 300 },
+  'condicionador': { nome: 'Condicionador (em saco plástico, até 400ml)', max: 400 },
+  'absorvente': { nome: 'Absorventes (só para unidades femininas, até 20 unidades)', max: 20, sexo: 'feminino' },
+  'papel_higienico': { nome: 'Papel higiênico (masculino, até 2 rolos)', max: 2, sexo: 'masculino' },
+  'papel_higienico_fem': { nome: 'Papel higiênico (feminino, até 6 rolos)', max: 6, sexo: 'feminino' },
+  'cotonetes': { nome: 'Cotonetes (em saco plástico, até 10 unidades)', max: 10 },
   'escova_dental': { nome: 'Escova dental modelo viagem (com capa/copinho desmontável)', max: 1 },
-  'barbeador': { nome: '2 barbeadores plásticos com no máximo duas lâminas (com devolução dos usados)', max: 2 },
-  // Alimentação
-  'bolacha': { nome: '1 kg de bolachas (sal ou doce – maizena, maria, cream cracker – em saco plástico)', max: 1 },
-  'pao_forma': { nome: '2 pacotes de pão de forma (até 1 kg cada, fatiado, em saco plástico)', max: 2 },
-  'presunto': { nome: '100 g de presunto e/ou salame ou apresuntado (fatiado, em saco plástico)', max: 1 },
-  'mussarela': { nome: '100 g de muçarela fatiada (industrializada, em saco plástico)', max: 1 },
-  'frutas': { nome: '250 g de frutas picadas e descascadas (mamão, maçã, pêssego, melancia, melão, banana, abacate, manga – em saco plástico)', max: 1 },
+  'barbeador': { nome: 'Barbeadores plásticos com no máximo duas lâminas (até 2, com devolução dos usados)', max: 2 },
+  'bolacha': { nome: 'Bolachas (sal ou doce – maizena, maria, cream cracker – em saco plástico, até 1kg)', max: 1000 },
+  'pao_forma': { nome: 'Pão de forma (fatiado, em saco plástico, até 2kg total)', max: 2000 },
+  'presunto': { nome: 'Presunto e/ou salame ou apresuntado (fatiado, em saco plástico, até 100g)', max: 100 },
+  'mussarela': { nome: 'Muçarela fatiada (industrializada, em saco plástico, até 100g)', max: 100 },
+  'frutas': { nome: 'Frutas picadas e descascadas (em saco plástico, até 250g)', max: 250 },
 };
 
 // Unificar todos os itens em um único objeto
 const ITENS_TODOS: ItensMap = { ...ITENS_TRIMESTRAIS, ...ITENS_QUINZENAIS, ...ITENS_PONTUAIS };
 
 // Adicionar unidade/medida para cada item (exemplo)
-const UNIDADES: { [key: string]: string } = {
+export const UNIDADES: { [key: string]: string } = {
   lencol: 'unidade',
   cobertor: 'unidade',
   toalha: 'unidade',
@@ -89,14 +88,13 @@ const UNIDADES: { [key: string]: string } = {
   esponja_lavar: 'unidade',
   rodo: 'unidade',
   vassoura: 'unidade',
-  creme_dental: 'unidade',
-  desodorante: 'unidade',
-  detergente_litro: 'litro',
-  sabao_po: '500g',
-  desinfetante: 'litro',
-  sabonete_liquido: 'litro',
-  agua_sanitaria: 'litro',
-  detergente_500ml: 'frasco',
+  creme_dental: 'g',
+  desodorante: 'ml',
+  sabao_po: 'g',
+  desinfetante: 'ml',
+  sabonete_liquido: 'ml',
+  agua_sanitaria: 'ml',
+  detergente_500ml: 'ml',
   esponja_banho: 'unidade',
   shampoo: 'ml',
   condicionador: 'ml',
@@ -106,8 +104,8 @@ const UNIDADES: { [key: string]: string } = {
   cotonetes: 'unidade',
   escova_dental: 'unidade',
   barbeador: 'unidade',
-  bolacha: 'kg',
-  pao_forma: 'pacote',
+  bolacha: 'g',
+  pao_forma: 'g',
   presunto: 'g',
   mussarela: 'g',
   frutas: 'g',
@@ -128,6 +126,7 @@ export function RegistrarEntrega() {
   const [presoSelecionado, setPresoSelecionado] = useState<Preso | null>(null);
   const [sugestoesPresos, setSugestoesPresos] = useState<Preso[]>([]);
   const [buscaPreso, setBuscaPreso] = useState('');
+  const { user } = useAuthStore();
   const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm<EntregaFormData>();
 
   // Buscar sugestões de presos por nome ou prontuário
@@ -162,6 +161,19 @@ export function RegistrarEntrega() {
       if (!presoSelecionado || !presoSelecionado.id) {
         throw new Error('Selecione um preso para registrar a entrega');
       }
+
+      if (!user) {
+        throw new Error('Usuário não autenticado');
+      }
+
+      // Buscar dados do usuário
+      const { data: userData, error: userError } = await supabase
+        .from('profiles')
+        .select('nome_completo')
+        .eq('id', user.id)
+        .single();
+
+      if (userError) throw userError;
 
       // Filtrar apenas itens com quantidade > 0
       const itensSelecionados = Object.entries(data.itens || {}).filter(([_, quantidade]) => quantidade && quantidade > 0);
@@ -203,6 +215,8 @@ export function RegistrarEntrega() {
       const dadosEntrega: any = {
         preso_id: presoSelecionado.id,
         data_entrega: new Date().toISOString(),
+        recebido_por: userData.nome_completo,
+        usuario_id: user.id
       };
       for (const [itemId, quantidade] of itensSelecionados) {
         dadosEntrega[itemId] = quantidade;
@@ -279,10 +293,21 @@ export function RegistrarEntrega() {
                         type="number"
                         min="0"
                         max={item.max}
+                        step="1"
                         {...register(`itens.${id}`, {
+                          min: 0,
                           max: item.max,
                           valueAsNumber: true,
                         })}
+                        onInput={(e) => {
+                          const value = parseInt((e.target as HTMLInputElement).value);
+                          if (value > item.max) {
+                            (e.target as HTMLInputElement).value = item.max.toString();
+                          }
+                          if (value < 0) {
+                            (e.target as HTMLInputElement).value = "0";
+                          }
+                        }}
                         className="w-20 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                       />
                       <span className="text-xs text-gray-500">{UNIDADES[id] || 'unidade'}</span>
@@ -305,10 +330,21 @@ export function RegistrarEntrega() {
                         type="number"
                         min="0"
                         max={item.max}
+                        step="1"
                         {...register(`itens.${id}`, {
+                          min: 0,
                           max: item.max,
                           valueAsNumber: true,
                         })}
+                        onInput={(e) => {
+                          const value = parseInt((e.target as HTMLInputElement).value);
+                          if (value > item.max) {
+                            (e.target as HTMLInputElement).value = item.max.toString();
+                          }
+                          if (value < 0) {
+                            (e.target as HTMLInputElement).value = "0";
+                          }
+                        }}
                         className="w-20 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-green-500 focus:border-green-500"
                       />
                       <span className="text-xs text-gray-500">{UNIDADES[id] || 'unidade'}</span>
