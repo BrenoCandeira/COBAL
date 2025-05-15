@@ -64,10 +64,10 @@ export function Relatorios() {
 
       // Aplicar filtros
       if (filtros.dataInicio) {
-        query = query.gte('created_at', filtros.dataInicio);
+        query = query.gte('data_entrega', filtros.dataInicio);
       }
       if (filtros.dataFim) {
-        query = query.lte('created_at', filtros.dataFim);
+        query = query.lte('data_entrega', filtros.dataFim);
       }
       if (filtros.ala) {
         query = query.eq('presos.ala', filtros.ala);

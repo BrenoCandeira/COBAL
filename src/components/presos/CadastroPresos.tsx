@@ -12,6 +12,8 @@ const ALAS = [
 
 const CELAS_ESPECIAIS = ['Trabalhadores', 'Triagem', 'Seguro'];
 
+const PRESOS_POR_PAGINA = 20;
+
 export function CadastroPresos() {
   const [presos, setPresos] = useState<Preso[]>([]);
   const [loading, setLoading] = useState(false);
@@ -25,16 +27,26 @@ export function CadastroPresos() {
   const [showAjuda, setShowAjuda] = useState(false);
   const [supabaseError, setSupabaseError] = useState<any>(null);
   const [presosSelecionados, setPresosSelecionados] = useState<string[]>([]);
+  const [paginaAtual, setPaginaAtual] = useState(1);
+  const [totalPaginas, setTotalPaginas] = useState(1);
 
   useEffect(() => {
     carregarPresos();
-  }, []);
+  }, [paginaAtual]);
 
   const carregarPresos = async () => {
     setLoading(true);
     setError('');
     setSupabaseError(null);
-    const { data, error } = await supabase.from('presos').select('*').order('created_at', { ascending: false });
+    // Buscar total de presos para paginação
+    const { count } = await supabase.from('presos').select('*', { count: 'exact', head: true });
+    setTotalPaginas(Math.ceil((count || 1) / PRESOS_POR_PAGINA));
+    // Buscar presos da página atual
+    const { data, error } = await supabase
+      .from('presos')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .range((paginaAtual - 1) * PRESOS_POR_PAGINA, paginaAtual * PRESOS_POR_PAGINA - 1);
     if (error) {
       setError('Erro ao carregar presos');
       setSupabaseError(error);
@@ -373,6 +385,26 @@ export function CadastroPresos() {
           </table>
         </div>
       </div>
+      {/* Paginação */}
+      {totalPaginas > 1 && (
+        <div className="flex justify-center my-4 gap-2">
+          <button
+            className="px-3 py-1 rounded bg-gray-200 hover:bg-gray-300"
+            disabled={paginaAtual === 1}
+            onClick={() => setPaginaAtual((p) => Math.max(1, p - 1))}
+          >
+            Anterior
+          </button>
+          <span className="px-2">Página {paginaAtual} de {totalPaginas}</span>
+          <button
+            className="px-3 py-1 rounded bg-gray-200 hover:bg-gray-300"
+            disabled={paginaAtual === totalPaginas}
+            onClick={() => setPaginaAtual((p) => Math.min(totalPaginas, p + 1))}
+          >
+            Próxima
+          </button>
+        </div>
+      )}
     </div>
   );
 } 

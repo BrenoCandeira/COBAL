@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { supabase } from '../../lib/supabase';
 import { useAuthStore } from '../../stores/authStore';
@@ -128,21 +128,28 @@ export function RegistrarEntrega() {
   const [buscaPreso, setBuscaPreso] = useState('');
   const { user } = useAuthStore();
   const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm<EntregaFormData>();
+  const debounceTimeout = useRef<NodeJS.Timeout | null>(null);
 
   // Buscar sugestões de presos por nome ou prontuário
   useEffect(() => {
-    const buscar = async () => {
-      if (buscaPreso.length < 2) {
-        setSugestoesPresos([]);
-        return;
-      }
-      const { data, error } = await supabase
-        .from('presos')
-        .select('*')
-        .or(`nome.ilike.%${buscaPreso}%,prontuario.ilike.%${buscaPreso}%`);
-      setSugestoesPresos(data || []);
+    if (debounceTimeout.current) clearTimeout(debounceTimeout.current);
+    debounceTimeout.current = setTimeout(() => {
+      const buscar = async () => {
+        if (buscaPreso.length < 2) {
+          setSugestoesPresos([]);
+          return;
+        }
+        const { data, error } = await supabase
+          .from('presos')
+          .select('id, nome, prontuario, sexo, ala, cela')
+          .or(`nome.ilike.%${buscaPreso}%,prontuario.ilike.%${buscaPreso}%`);
+        setSugestoesPresos(data || []);
+      };
+      buscar();
+    }, 400);
+    return () => {
+      if (debounceTimeout.current) clearTimeout(debounceTimeout.current);
     };
-    buscar();
   }, [buscaPreso]);
 
   // Função para selecionar preso da sugestão

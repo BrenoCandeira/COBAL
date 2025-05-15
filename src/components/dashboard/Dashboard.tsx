@@ -44,9 +44,13 @@ export function Dashboard() {
   const [erro, setErro] = useState<string | null>(null);
   const [carregando, setCarregando] = useState(false);
 
+  const ENTREGAS_POR_PAGINA = 100;
+  const [paginaAtual, setPaginaAtual] = useState(1);
+  const [totalPaginas, setTotalPaginas] = useState(1);
+
   useEffect(() => {
     carregarEstatisticas();
-  }, [periodo]);
+  }, [periodo, paginaAtual]);
 
   const carregarEstatisticas = async () => {
     try {
@@ -60,11 +64,20 @@ export function Dashboard() {
         dataInicio.setMonth(dataInicio.getMonth() - 1);
       }
 
-      // Buscar todas as entregas do período
+      // Buscar total de entregas para paginação
+      const { count } = await supabase
+        .from('entregas')
+        .select('*', { count: 'exact', head: true })
+        .gte('data_entrega', dataInicio.toISOString());
+      setTotalPaginas(Math.ceil((count || 1) / ENTREGAS_POR_PAGINA));
+
+      // Buscar entregas da página atual
       const { data: entregas, error } = await supabase
         .from('entregas')
         .select('*')
-        .gte('data_entrega', dataInicio.toISOString());
+        .gte('data_entrega', dataInicio.toISOString())
+        .order('data_entrega', { ascending: false })
+        .range((paginaAtual - 1) * ENTREGAS_POR_PAGINA, paginaAtual * ENTREGAS_POR_PAGINA - 1);
 
       if (error) throw error;
 
@@ -254,6 +267,27 @@ export function Dashboard() {
               </div>
             </div>
           </div>
+
+          {/* Paginação */}
+          {totalPaginas > 1 && (
+            <div className="flex justify-center my-4 gap-2">
+              <button
+                className="px-3 py-1 rounded bg-gray-200 hover:bg-gray-300"
+                disabled={paginaAtual === 1}
+                onClick={() => setPaginaAtual((p) => Math.max(1, p - 1))}
+              >
+                Anterior
+              </button>
+              <span className="px-2">Página {paginaAtual} de {totalPaginas}</span>
+              <button
+                className="px-3 py-1 rounded bg-gray-200 hover:bg-gray-300"
+                disabled={paginaAtual === totalPaginas}
+                onClick={() => setPaginaAtual((p) => Math.min(totalPaginas, p + 1))}
+              >
+                Próxima
+              </button>
+            </div>
+          )}
         </>
       )}
     </div>
