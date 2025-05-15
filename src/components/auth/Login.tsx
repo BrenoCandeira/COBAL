@@ -1,115 +1,117 @@
 import { useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { supabase } from '../../lib/supabase';
+import { useNavigate } from 'react-router-dom';
+import { useAuthStore } from '../../stores/authStore';
 
 export function Login() {
+  const [email, setEmail] = useState('');
+  const [senha, setSenha] = useState('');
+  const [erro, setErro] = useState('');
+  const [carregando, setCarregando] = useState(false);
   const navigate = useNavigate();
-  const location = useLocation();
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const login = useAuthStore((state) => state.login);
 
-  const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
-    setError(null);
-
-    const formData = new FormData(e.currentTarget);
-    const email = formData.get('email') as string;
-    const password = formData.get('password') as string;
+    setErro('');
+    setCarregando(true);
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-      if (error) throw error;
-
-      // Redirecionar para a página anterior ou dashboard
-      const from = (location.state as any)?.from?.pathname || '/dashboard';
-      navigate(from, { replace: true });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erro ao fazer login');
+      const success = await login(email, senha);
+      if (success) {
+        navigate('/dashboard');
+      } else {
+        setErro('Email ou senha inválidos.');
+      }
+    } catch (error: any) {
+      setErro('Erro ao fazer login: ' + (error?.message || ''));
     } finally {
-      setLoading(false);
+      setCarregando(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
-        <div>
-          <img
-            className="mx-auto h-24 w-auto"
-            src="/emblema-ppgo.png"
-            alt="Brasão PPGO"
-          />
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-            Sistema de Controle de COBAL
+    <div className="min-h-screen flex items-center justify-center bg-gray-100 py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-md w-full bg-white rounded-lg shadow-md overflow-hidden">
+        <div className="bg-blue-600 py-6 px-4 sm:px-10">
+          <div className="flex justify-center">
+            <img
+              src="/emblema-ppgo.png"
+              alt="Emblema da Polícia Penal de Goiás"
+              className="h-24 w-auto"
+            />
+          </div>
+          <h2 className="mt-4 text-center text-2xl font-extrabold text-white">
+            Login
           </h2>
-          <p className="mt-2 text-center text-sm text-gray-600">
-            Casa de Prisão Provisória PP Jaílton Barbo Ferreira de Luziânia GO
+          <p className="mt-2 text-center text-sm text-blue-100">
+            CPP Luziânia - Sistema de Controle de Entregas
           </p>
         </div>
-        <form className="mt-8 space-y-6" onSubmit={handleLogin}>
-          <div className="rounded-md shadow-sm -space-y-px">
+
+        <div className="p-6">
+          {erro && (
+            <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
+              {erro}
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label htmlFor="email" className="sr-only">
-                Email
+              <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+                E-mail
               </label>
               <input
                 id="email"
-                name="email"
                 type="email"
                 required
-                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-primary-500 focus:border-primary-500 focus:z-10 sm:text-sm"
-                placeholder="Email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
               />
             </div>
+
             <div>
-              <label htmlFor="password" className="sr-only">
+              <label htmlFor="senha" className="block text-sm font-medium text-gray-700">
                 Senha
               </label>
               <input
-                id="password"
-                name="password"
+                id="senha"
                 type="password"
                 required
-                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-primary-500 focus:border-primary-500 focus:z-10 sm:text-sm"
-                placeholder="Senha"
+                value={senha}
+                onChange={(e) => setSenha(e.target.value)}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
               />
             </div>
-          </div>
 
-          {error && (
-            <div className="text-red-600 text-sm text-center">{error}</div>
-          )}
+            <div>
+              <button
+                type="submit"
+                disabled={carregando}
+                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+              >
+                {carregando ? 'Entrando...' : 'Entrar'}
+              </button>
+            </div>
+          </form>
 
-          <div>
+          <div className="mt-4 text-center">
             <button
-              type="submit"
-              disabled={loading}
-              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+              onClick={() => navigate('/register')}
+              className="text-sm text-blue-600 hover:text-blue-500"
             >
-              {loading ? 'Entrando...' : 'Entrar'}
+              Não tem uma conta? Cadastre-se
             </button>
           </div>
-        </form>
-        <div className="flex flex-col items-center mt-4 space-y-2">
-          <button
-            type="button"
-            className="text-primary-600 hover:underline text-sm"
-            onClick={() => navigate('/register')}
-          >
-            Cadastrar novo usuário
-          </button>
-          <button
-            type="button"
-            className="text-primary-600 hover:underline text-sm"
-            onClick={() => navigate('/reset-password')}
-          >
-            Esqueci minha senha
-          </button>
+
+          <div className="mt-2 text-center">
+            <button
+              onClick={() => navigate('/forgot-password')}
+              className="text-sm text-gray-600 hover:text-gray-500"
+            >
+              Esqueceu sua senha?
+            </button>
+          </div>
         </div>
       </div>
     </div>

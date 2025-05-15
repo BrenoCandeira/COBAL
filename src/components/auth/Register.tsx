@@ -1,22 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
-
-function validarCPF(cpf: string) {
-  cpf = cpf.replace(/[\D]/g, '');
-  if (cpf.length !== 11 || /^(\d)\1+$/.test(cpf)) return false;
-  let soma = 0, resto;
-  for (let i = 1; i <= 9; i++) soma += parseInt(cpf.substring(i - 1, i)) * (11 - i);
-  resto = (soma * 10) % 11;
-  if (resto === 10 || resto === 11) resto = 0;
-  if (resto !== parseInt(cpf.substring(9, 10))) return false;
-  soma = 0;
-  for (let i = 1; i <= 10; i++) soma += parseInt(cpf.substring(i - 1, i)) * (12 - i);
-  resto = (soma * 10) % 11;
-  if (resto === 10 || resto === 11) resto = 0;
-  if (resto !== parseInt(cpf.substring(10, 11))) return false;
-  return true;
-}
+import { validarCPF } from '../../utils/validadores';
 
 function formatarCPF(valor: string) {
   valor = valor.replace(/\D/g, '');
@@ -59,25 +44,40 @@ export function Register() {
       setErro('As senhas não coincidem.');
       return;
     }
+
     setCarregando(true);
     try {
-      const { error } = await supabase.auth.signUp({
+      // Primeiro, criar o usuário no auth
+      const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
-        password: senha,
-        options: {
-          data: {
-            nome,
-            cpf,
-          },
-        },
+        password: senha
       });
-      if (error) throw error;
-      setSucesso('Usuário cadastrado! Verifique seu e-mail para ativar a conta.');
-      setNome('');
-      setCpf('');
-      setEmail('');
-      setSenha('');
-      setConfirmarSenha('');
+
+      if (authError) throw authError;
+
+      if (authData.user) {
+        // Depois, criar o perfil
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .insert([
+            {
+              id: authData.user.id,
+              nome_completo: nome,
+              cpf: cpf.replace(/\D/g, '')
+            }
+          ]);
+
+        if (profileError) {
+          // Se houver erro ao criar o perfil, tentar deletar o usuário
+          await supabase.auth.admin.deleteUser(authData.user.id);
+          throw profileError;
+        }
+
+        setSucesso('Cadastro realizado com sucesso! Redirecionando para o login...');
+        setTimeout(() => {
+          navigate('/login');
+        }, 2000);
+      }
     } catch (error: any) {
       setErro('Erro ao cadastrar usuário: ' + (error?.message || ''));
     } finally {
@@ -87,92 +87,126 @@ export function Register() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
-        <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">Cadastrar novo usuário</h2>
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-          <div className="rounded-md shadow-sm -space-y-px flex flex-col gap-2">
+      <div className="max-w-md w-full bg-white rounded-lg shadow-md overflow-hidden">
+        <div className="bg-blue-600 py-6 px-4 sm:px-10">
+          <div className="flex justify-center">
+            <img
+              src="/emblema-ppgo.png"
+              alt="Emblema da Polícia Penal de Goiás"
+              className="h-24 w-auto"
+            />
+          </div>
+          <h2 className="mt-4 text-center text-2xl font-extrabold text-white">
+            Cadastro de Usuário
+          </h2>
+          <p className="mt-2 text-center text-sm text-blue-100">
+            CPP Luziânia - Sistema de Controle de Entregas
+          </p>
+        </div>
+
+        <div className="p-6">
+          {erro && (
+            <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
+              {erro}
+            </div>
+          )}
+          {sucesso && (
+            <div className="mb-4 p-3 bg-green-100 border border-green-400 text-green-700 rounded">
+              {sucesso}
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label htmlFor="nome" className="sr-only">Nome completo</label>
+              <label htmlFor="nome" className="block text-sm font-medium text-gray-700">
+                Nome Completo
+              </label>
               <input
                 id="nome"
-                name="nome"
                 type="text"
                 required
-                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-primary-500 focus:border-primary-500 focus:z-10 sm:text-sm"
-                placeholder="Nome completo"
                 value={nome}
                 onChange={(e) => setNome(e.target.value)}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
               />
             </div>
+
             <div>
-              <label htmlFor="cpf" className="sr-only">CPF</label>
+              <label htmlFor="cpf" className="block text-sm font-medium text-gray-700">
+                CPF
+              </label>
               <input
                 id="cpf"
-                name="cpf"
                 type="text"
                 required
-                maxLength={14}
-                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-primary-500 focus:border-primary-500 focus:z-10 sm:text-sm"
-                placeholder="CPF (somente números)"
                 value={cpf}
-                onChange={(e) => setCpf(formatarCPF(e.target.value))}
+                onChange={(e) => setCpf(e.target.value)}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
               />
             </div>
+
             <div>
-              <label htmlFor="email" className="sr-only">E-mail institucional</label>
+              <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+                E-mail
+              </label>
               <input
                 id="email"
-                name="email"
                 type="email"
                 required
-                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-primary-500 focus:border-primary-500 focus:z-10 sm:text-sm"
-                placeholder="E-mail institucional"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
               />
             </div>
+
             <div>
-              <label htmlFor="senha" className="sr-only">Senha</label>
+              <label htmlFor="senha" className="block text-sm font-medium text-gray-700">
+                Senha
+              </label>
               <input
                 id="senha"
-                name="senha"
                 type="password"
                 required
-                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-primary-500 focus:border-primary-500 focus:z-10 sm:text-sm"
-                placeholder="Senha"
                 value={senha}
                 onChange={(e) => setSenha(e.target.value)}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
               />
             </div>
+
             <div>
-              <label htmlFor="confirmarSenha" className="sr-only">Confirmar senha</label>
+              <label htmlFor="confirmarSenha" className="block text-sm font-medium text-gray-700">
+                Confirmar Senha
+              </label>
               <input
                 id="confirmarSenha"
-                name="confirmarSenha"
                 type="password"
                 required
-                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-primary-500 focus:border-primary-500 focus:z-10 sm:text-sm"
-                placeholder="Confirmar senha"
                 value={confirmarSenha}
                 onChange={(e) => setConfirmarSenha(e.target.value)}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
               />
             </div>
-          </div>
-          {erro && <div className="text-red-600 text-sm text-center">{erro}</div>}
-          {sucesso && <div className="text-green-600 text-sm text-center">{sucesso}</div>}
-          <div>
+
+            <div>
+              <button
+                type="submit"
+                disabled={carregando}
+                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+              >
+                {carregando ? 'Cadastrando...' : 'Cadastrar'}
+              </button>
+            </div>
+          </form>
+
+          <div className="mt-4 text-center">
             <button
-              type="submit"
-              disabled={carregando}
-              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+              onClick={() => navigate('/login')}
+              className="text-sm text-blue-600 hover:text-blue-500"
             >
-              {carregando ? 'Cadastrando...' : 'Cadastrar'}
+              Já tem uma conta? Faça login
             </button>
           </div>
-          <div className="text-center mt-2">
-            <button type="button" className="text-primary-600 hover:underline" onClick={() => navigate('/login')}>Já tenho conta</button>
-          </div>
-        </form>
+        </div>
       </div>
     </div>
   );

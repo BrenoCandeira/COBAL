@@ -64,31 +64,33 @@ export const useAuthStore = create<AuthState>()(
       
       register: async (email: string, password: string, nomeCompleto: string, cpf: string) => {
         try {
-          const { data, error } = await supabase.auth.signUp({
+          // Primeiro, criar o usuário no auth
+          const { data: authData, error: authError } = await supabase.auth.signUp({
             email,
-            password,
-            options: {
-              data: {
-                nome_completo: nomeCompleto,
-                cpf: cpf
-              }
-            }
+            password
           });
           
-          if (error) throw error;
+          if (authError) throw authError;
           
-          if (data.user) {
+          if (authData.user) {
+            // Depois, criar o perfil
             const { error: profileError } = await supabase
               .from('profiles')
               .insert([
                 {
-                  id: data.user.id,
+                  id: authData.user.id,
                   nome_completo: nomeCompleto,
                   cpf: cpf
-                },
-              ]);
+                }
+              ])
+              .select()
+              .single();
             
-            if (profileError) throw profileError;
+            if (profileError) {
+              // Se houver erro ao criar o perfil, tentar deletar o usuário
+              await supabase.auth.admin.deleteUser(authData.user.id);
+              throw profileError;
+            }
             
             return true;
           }
@@ -173,6 +175,9 @@ export const useAuthStore = create<AuthState>()(
     {
       name: 'auth-storage',
       partialize: (state) => ({
+        user: state.user,
+        profile: state.profile,
+        isAuthenticated: state.isAuthenticated,
         lastActivity: state.lastActivity,
       }),
     }
@@ -180,10 +185,17 @@ export const useAuthStore = create<AuthState>()(
 );
 
 // Listener para mudanças na sessão
-supabase.auth.onAuthStateChange((event, session) => {
+supabase.auth.onAuthStateChange(async (event, session) => {
   if (event === 'SIGNED_IN' && session?.user) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', session.user.id)
+      .single();
+
     useAuthStore.setState({
       user: session.user,
+      profile,
       isAuthenticated: true,
       lastActivity: Date.now(),
     });

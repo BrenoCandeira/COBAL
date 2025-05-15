@@ -171,9 +171,11 @@ export function RegistrarEntrega() {
         .from('profiles')
         .select('nome_completo')
         .eq('id', user.id)
-        .single();
+        .limit(1)
+        .maybeSingle();
 
       if (userError) throw userError;
+      if (!userData) throw new Error('Perfil do usuário não encontrado');
 
       // Filtrar apenas itens com quantidade > 0
       const itensSelecionados = Object.entries(data.itens || {}).filter(([_, quantidade]) => quantidade && quantidade > 0);
