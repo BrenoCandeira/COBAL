@@ -12,30 +12,28 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
   const location = useLocation();
 
   useEffect(() => {
+    const verificarAutenticacao = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        setAutenticado(!!session);
+      } catch (error) {
+        setAutenticado(false);
+      } finally {
+        setCarregando(false);
+      }
+    };
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setAutenticado(!!session);
       setCarregando(false);
     });
 
+    verificarAutenticacao();
+
     return () => {
       subscription.unsubscribe();
     };
   }, []);
-
-  useEffect(() => {
-    verificarAutenticacao();
-  }, []);
-
-  const verificarAutenticacao = async () => {
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      setAutenticado(!!session);
-    } catch (error) {
-      setAutenticado(false);
-    } finally {
-      setCarregando(false);
-    }
-  };
 
   if (carregando) {
     return (
@@ -46,7 +44,6 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
   }
 
   if (!autenticado) {
-    // Salvar a rota atual para redirecionar após o login
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
