@@ -2,29 +2,106 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
 import { Shield, AlertCircle, Loader, ArrowLeft } from 'lucide-react';
+import { supabase } from '../lib/supabase';
+
+// Função para validar CPF
+const validarCPF = (cpf: string) => {
+  cpf = cpf.replace(/[^\d]/g, '');
+  
+  if (cpf.length !== 11) return false;
+  
+  if (/^(\d)\1+$/.test(cpf)) return false;
+  
+  let soma = 0;
+  for (let i = 0; i < 9; i++) {
+    soma += parseInt(cpf.charAt(i)) * (10 - i);
+  }
+  
+  let resto = soma % 11;
+  let digito1 = resto < 2 ? 0 : 11 - resto;
+  
+  if (digito1 !== parseInt(cpf.charAt(9))) return false;
+  
+  soma = 0;
+  for (let i = 0; i < 10; i++) {
+    soma += parseInt(cpf.charAt(i)) * (11 - i);
+  }
+  
+  resto = soma % 11;
+  let digito2 = resto < 2 ? 0 : 11 - resto;
+  
+  return digito2 === parseInt(cpf.charAt(10));
+};
+
+// Função para formatar CPF
+const formatarCPF = (cpf: string) => {
+  cpf = cpf.replace(/\D/g, '');
+  return cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+};
 
 const Register: React.FC = () => {
   const navigate = useNavigate();
   const { register } = useAuthStore();
   
   const [nomeCompleto, setNomeCompleto] = useState('');
+  const [cpf, setCpf] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   
+  const verificarDuplicidade = async () => {
+    // Verificar email
+    const { data: emailExiste } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('email', email)
+      .single();
+    
+    if (emailExiste) {
+      throw new Error('Este email já está cadastrado');
+    }
+    
+    // Verificar CPF
+    const { data: cpfExiste } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('cpf', cpf.replace(/\D/g, ''))
+      .single();
+    
+    if (cpfExiste) {
+      throw new Error('Este CPF já está cadastrado');
+    }
+    
+    // Verificar nome completo
+    const { data: nomeExiste } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('nome_completo', nomeCompleto)
+      .single();
+    
+    if (nomeExiste) {
+      throw new Error('Este nome completo já está cadastrado');
+    }
+  };
+  
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     
-    if (!nomeCompleto || !email || !password || !confirmPassword) {
+    if (!nomeCompleto || !email || !password || !confirmPassword || !cpf) {
       setError('Todos os campos são obrigatórios');
       return;
     }
     
     if (nomeCompleto.length < 3) {
       setError('O nome completo deve ter pelo menos 3 caracteres');
+      return;
+    }
+    
+    if (!validarCPF(cpf)) {
+      setError('CPF inválido');
       return;
     }
     
@@ -46,7 +123,10 @@ const Register: React.FC = () => {
     setIsLoading(true);
     
     try {
-      const success = await register(email, password, nomeCompleto);
+      // Verificar duplicidade antes de tentar registrar
+      await verificarDuplicidade();
+      
+      const success = await register(email, password, nomeCompleto, cpf.replace(/\D/g, ''));
       
       if (success) {
         navigate('/login', { 
@@ -59,7 +139,7 @@ const Register: React.FC = () => {
         setError('Não foi possível realizar o cadastro. Tente novamente.');
       }
     } catch (err) {
-      setError('Erro ao realizar cadastro. Tente novamente.');
+      setError(err instanceof Error ? err.message : 'Erro ao realizar cadastro. Tente novamente.');
     } finally {
       setIsLoading(false);
     }
@@ -107,6 +187,25 @@ const Register: React.FC = () => {
                   onChange={(e) => setNomeCompleto(e.target.value)}
                   className="form-input"
                   placeholder="Seu nome completo"
+                />
+              </div>
+            </div>
+            
+            <div>
+              <label htmlFor="cpf" className="form-label">
+                CPF
+              </label>
+              <div className="mt-1">
+                <input
+                  id="cpf"
+                  name="cpf"
+                  type="text"
+                  required
+                  maxLength={14}
+                  value={cpf}
+                  onChange={(e) => setCpf(formatarCPF(e.target.value))}
+                  className="form-input"
+                  placeholder="000.000.000-00"
                 />
               </div>
             </div>
@@ -185,17 +284,17 @@ const Register: React.FC = () => {
                 )}
               </button>
             </div>
+            
+            <div className="text-center">
+              <Link
+                to="/login"
+                className="inline-flex items-center text-sm text-primary hover:text-primary-dark"
+              >
+                <ArrowLeft className="h-4 w-4 mr-1" />
+                Voltar ao login
+              </Link>
+            </div>
           </form>
-          
-          <div className="mt-6 text-center">
-            <Link
-              to="/login"
-              className="flex items-center justify-center text-sm text-primary hover:text-primary-dark"
-            >
-              <ArrowLeft className="h-4 w-4 mr-1" />
-              Voltar para o login
-            </Link>
-          </div>
         </div>
       </div>
     </div>

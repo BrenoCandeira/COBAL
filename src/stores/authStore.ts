@@ -12,7 +12,7 @@ interface AuthState {
   sessionTimeout: number;
   
   login: (email: string, password: string) => Promise<boolean>;
-  register: (email: string, password: string, nomeCompleto: string) => Promise<boolean>;
+  register: (email: string, password: string, nomeCompleto: string, cpf: string) => Promise<boolean>;
   logout: () => Promise<void>;
   resetPassword: (email: string) => Promise<boolean>;
   updateProfile: (data: Partial<Profile>) => Promise<boolean>;
@@ -62,11 +62,17 @@ export const useAuthStore = create<AuthState>()(
         }
       },
       
-      register: async (email: string, password: string, nomeCompleto: string) => {
+      register: async (email: string, password: string, nomeCompleto: string, cpf: string) => {
         try {
           const { data, error } = await supabase.auth.signUp({
             email,
             password,
+            options: {
+              data: {
+                nome_completo: nomeCompleto,
+                cpf: cpf
+              }
+            }
           });
           
           if (error) throw error;
@@ -78,6 +84,7 @@ export const useAuthStore = create<AuthState>()(
                 {
                   id: data.user.id,
                   nome_completo: nomeCompleto,
+                  cpf: cpf
                 },
               ]);
             
